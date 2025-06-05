@@ -19,12 +19,18 @@ class Node:
         return self.color
 
 class Edge:
-    def __init__(self, next):
+    def __init__(self, cur, next):
         self.color = ''
         self.weight = 0
     def set_color(self, value):
         self.color = value
-
+    def get_color(self):
+        return self.color
+    def get_weight(self):
+        return self.weight
+    def set_weight(self, val):
+        self.weight = val
+    
 
 
 
