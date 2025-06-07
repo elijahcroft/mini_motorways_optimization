@@ -74,11 +74,14 @@ d.set_color("blue")
 nodes = [a,b,c,d,e]
 
 
-
+edges = [(1,0), (2,1), (-1,10),(2,10)]
 #generates random data
 for _ in range(100):
     _ = Node((random.randint(-100,100), random.randint(-100,100)))
     nodes.append(_)
+    edges.append((random.randint(-100,100), random.randint(-100,100)))
+
+
 
 
 nodes_plot = []
@@ -94,7 +97,21 @@ for node in nodes:
     node_x.append(node.get_val()[0])
     node_y.append(node.get_val()[1])
     
-#plots the random data, eventually it will not
-fig, ax = plt.subplots(figsize=(5, 2.7))
-ax.scatter(node_x, node_y, s=50, facecolor='C1', edgecolor='k', )
+fig, ax = plt.subplots(figsize=(6, 3))
+ax.set_title("Node Layout", fontsize=12)
+ax.set_xlabel("X Position")
+ax.set_ylabel("Y Position")
+
+# Aesthetics
+ax.grid(True, linestyle='--', alpha=0.5)
+ax.set_facecolor("#f9f9f9")
+
+# Scatter plot
+ax.scatter(node_x, node_y, s=70, c='orange', edgecolor='black', linewidth=1)
+
+for start, end in edges:
+    x_values = [node_x[start], node_x[end]]
+    y_values = [node_y[start], node_y[end]]
+    ax.plot(x_values, y_values, color='gray', linewidth=1, linestyle='--')
+plt.tight_layout()
 plt.show()
