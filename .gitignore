@@ -1,0 +1,16 @@
+.venv/
+myenv/
+__pycache__/
+*.pyc
+/layout.png
+/detected.png
+/screenshot.png
+.mypy_cache/
+.ruff_cache/
+*.egg-info/
+build/
+dist/
+/board.json
+
+# leftovers from the pre-rewrite version; still on disk, delete when you are sure
+house_images/

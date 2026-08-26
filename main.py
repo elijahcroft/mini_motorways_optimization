@@ -1,117 +1,218 @@
-import math
-import heapq
-from node import Node, Edge
-import matplotlib.pyplot as plt
-import numpy as np
-import random
+"""Mini Motorways route planner.
+
+    python main.py solve boards/riverside.json -o layout.png
+    python main.py solve boards/riverside.json --spread 1 --fit-budget
+    python main.py detect shot.png -o board.json --solve
+    python main.py capture
+"""
+
+from __future__ import annotations
+
+import argparse
+import json
+import sys
+
+from board import Board
+from solver import Solution, solve
 
 
-#we will screenshot the screen, then use the get all function
-def screenshot():
-    screenshot_num = 0
-    img = pyautogui.screenshot(f"Screenshot{screenshot_num}.png")
-    screenshot_num += 1
+def _report(board: Board, solution: Solution, out=None) -> None:
+    # Resolved on each call, not bound at import, so redirected output works.
+    stream = out if out is not None else sys.stdout
 
-def pathfind(graph, start):
-    dist = {node: float('inf') for node in graph }
-    dist[start] = 0
-    pq = [(0, start)]
-    pass
+    def p(*a):
+        print(*a, file=stream)
 
-def get_all(house_image):
-    all_house = []
-    for pos in pyautogui.locateAllOnScreen(house_image): #this returns left, top, width, height 
-        all_house.append(pos)
-    return all_house
+    over = solution.road_tiles > board.road_budget
+    p(f"road tiles   : {solution.road_tiles} / {board.road_budget} budget"
+      f"{'  OVER' if over else ''}")
+    p(f"connected    : {len(solution.paths)} of {len(board.houses)} houses")
+    if solution.paths:
+        p(f"average trip : {solution.average_trip_length:.1f} tiles "
+          f"(total {solution.total_trip_length})")
+    if solution.traffic:
+        cell, load = solution.hotspots(1)[0]
+        p(f"congestion   : {solution.congestion} "
+          f"(busiest tile {cell[0]},{cell[1]} carries {load} routes)")
+
+    loads = solution.store_loads()
+    pressure = solution.store_pressure()
+    p("stores:")
+    for s in sorted(board.stores, key=lambda s: -loads.get(s.pos, 0)):
+        n = loads.get(s.pos, 0)
+        flag = "  OVER CAPACITY" if n > s.capacity else ""
+        p(f"  {s.color:<7} at ({s.x},{s.y}): {n}/{s.capacity} houses, "
+          f"{pressure.get(s.pos, 0)} tiles of driving{flag}")
+
+    for h in solution.unreachable:
+        p(f"  ! {h.color} house at ({h.x},{h.y}) cannot reach a store")
+    for h in solution.dropped:
+        p(f"  ~ {h.color} house at ({h.x},{h.y}) left unconnected to fit the budget")
+    for w in solution.warnings:
+        p(f"  ! {w}")
 
 
+def _load_board(path: str) -> Board:
+    try:
+        board = Board.load(path)
+    except FileNotFoundError:
+        raise SystemExit(f"no such board file: {path}") from None
+    except json.JSONDecodeError as exc:
+        raise SystemExit(f"{path} is not valid JSON: {exc}") from None
+    except ValueError as exc:
+        raise SystemExit(f"{path}: {exc}") from None
+    except OSError as exc:  # a directory, a bad permission, a broken link
+        raise SystemExit(f"cannot read {path}: {exc.strerror}") from None
+    problems = board.validate()
+    if problems:
+        raise SystemExit(
+            "board is not valid:\n" + "\n".join(f"  - {p}" for p in problems)
+        )
+    return board
 
-def calculate_weight(Node, other): #overload no list
-    distances = []
-    
-    result = math.dist(Node.get_val(), other.get_val())
-    distances.append(result)
-    distances.append(Node.get_val())
-    distances.append(other.get_val())
 
-    return distances 
+def _plan(board: Board, args) -> Solution:
+    return solve(
+        board,
+        attempts=args.attempts,
+        rounds=args.rounds,
+        spread=args.spread,
+        fit_budget=args.fit_budget,
+    )
 
-    #this gets distance but idk what to do with that
 
-def calculate_weights(Node, others):
-    distances = []
-    for other in others:
-        result = math.dist(Node.get_val(), other.get_val())
-        distances.append(result)
-        distances.append(Node.get_val())
-        distances.append(other.get_val())
-
-    return distances 
-
-    #this gets distance but idk what to do with that
-def draw_edge(Node, other):
-    if(Node.get_color() == other.get_color()):
-        edge = Edge(Node, other)
-        edge.set_color(Node.get_color())
-        edge.set_weight(calculate_weight(Node, other))
-        return edge
+def cmd_solve(args) -> int:
+    board = _load_board(args.board)
+    solution = _plan(board, args)
+    if args.json:
+        print(json.dumps(solution.summary(), indent=2))
     else:
-        pass
+        _report(board, solution)
+    if args.out:
+        from render import render
+
+        print("wrote", render(board, solution, args.out, heat=not args.no_heat))
+    return 0
 
 
+def cmd_detect(args) -> int:
+    from PIL import UnidentifiedImageError
+
+    import vision
+
+    try:
+        board, blobs = vision.detect(args.image, detect_water=not args.no_water)
+    except FileNotFoundError:
+        raise SystemExit(f"no such image: {args.image}") from None
+    except UnidentifiedImageError:
+        raise SystemExit(f"{args.image} is not an image file") from None
+    except OSError as exc:  # a directory, a bad permission, a truncated file
+        raise SystemExit(f"cannot read {args.image}: {exc.strerror}") from None
+    if not board.houses and not board.stores:
+        print("no buildings found -- is this a screenshot of the game?",
+              file=sys.stderr)
+        return 1
+    print(f"found {len(blobs)} buildings -> {len(board.houses)} houses, "
+          f"{len(board.stores)} stores, {len(board.blocked)} blocked cells "
+          f"on a {board.width}x{board.height} grid")
+    if args.out:
+        board.save(args.out)
+        print("wrote", args.out)
+    if args.preview:
+        print("wrote", vision.preview(args.image, blobs, args.preview))
+    if args.solve:
+        problems = board.validate()
+        if problems:
+            print("detected board is not solvable:", file=sys.stderr)
+            for p in problems:
+                print("  -", p, file=sys.stderr)
+            return 1
+        solution = _plan(board, args)
+        _report(board, solution)
+        if args.layout:
+            from render import render
+
+            print("wrote", render(board, solution, args.layout, heat=not args.no_heat))
+    return 0
 
 
-
-a = Node((1,1))
-b = Node((2,2))
-c = Node((3,3))
-d = Node((-1, 10))
-e = Node((2,10))
-a.set_color("red")
-b.set_color("red")
-c.set_color("blue")
-d.set_color("blue")
-nodes = [a,b,c,d,e]
-
-
-edges = [(1,0), (2,1), (-1,10),(2,10)]
-#generates random data
-for _ in range(100):
-    _ = Node((random.randint(-100,100), random.randint(-100,100)))
-    nodes.append(_)
-    edges.append((random.randint(-100,100), random.randint(-100,100)))
+def cmd_capture(args) -> int:
+    try:
+        import pyautogui
+    except ImportError:
+        print("capture needs pyautogui: pip install pyautogui", file=sys.stderr)
+        return 1
+    pyautogui.screenshot().save(args.shot)
+    print("wrote", args.shot)
+    args.image = args.shot
+    args.solve = True
+    return cmd_detect(args)
 
 
+def _spread(value: str) -> float:
+    """argparse type for --spread: a price, so it cannot be negative."""
+    try:
+        f = float(value)
+    except ValueError:
+        raise argparse.ArgumentTypeError(f"{value!r} is not a number") from None
+    if f < 0:
+        raise argparse.ArgumentTypeError("spread must not be negative")
+    return f
 
 
-nodes_plot = []
-for i in range(len(nodes)):
-    for _ in range(len(nodes)):
-        if(nodes[i-1].get_color() == nodes[i].get_color() and nodes[i].get_color() != ''):
-            edge = draw_edge(nodes[i-1], nodes[i])
-            nodes_plot.append(edge.get_weight())
+def _add_solver_flags(p: argparse.ArgumentParser) -> None:
+    p.add_argument("--attempts", type=int, default=6,
+                   help="routing orders to try; more is slower but tighter")
+    p.add_argument("--rounds", type=int, default=4,
+                   help="cap on improvement passes per attempt; the loops stop "
+                        "when nothing improves, which is usually after two")
+    p.add_argument("--spread", type=_spread, default=0.0,
+                   help="price of congestion in road tiles; raise it to fan "
+                        "traffic out instead of funnelling it through one junction")
+    p.add_argument("--fit-budget", action="store_true",
+                   help="drop the least valuable houses until the plan fits "
+                        "the board's road budget")
+    p.add_argument("--no-heat", action="store_true",
+                   help="draw plain tarmac instead of shading roads by traffic")
 
-node_x = []
-node_y = []
-for node in nodes:
-    node_x.append(node.get_val()[0])
-    node_y.append(node.get_val()[1])
-    
-fig, ax = plt.subplots(figsize=(6, 3))
-ax.set_title("Node Layout", fontsize=12)
-ax.set_xlabel("X Position")
-ax.set_ylabel("Y Position")
 
-# Aesthetics
-ax.grid(True, linestyle='--', alpha=0.5)
-ax.set_facecolor("#f9f9f9")
+def main(argv: list[str] | None = None) -> int:
+    p = argparse.ArgumentParser(
+        description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
+    )
+    sub = p.add_subparsers(dest="cmd", required=True)
 
-# Scatter plot
-ax.scatter(node_x, node_y, s=70, c='orange', edgecolor='black', linewidth=1)
+    s = sub.add_parser("solve", help="plan roads for a board file")
+    s.add_argument("board")
+    s.add_argument("-o", "--out", default="layout.png", help="PNG to write")
+    s.add_argument("--json", action="store_true", help="print stats as JSON")
+    _add_solver_flags(s)
+    s.set_defaults(func=cmd_solve)
 
-for start, end in edges:
-    x_values = [node_x[start], node_x[end]]
-    y_values = [node_y[start], node_y[end]]
-    ax.plot(x_values, y_values, color='gray', linewidth=1, linestyle='--')
-plt.tight_layout()
-plt.show()
+    d = sub.add_parser("detect", help="read a screenshot into a board file")
+    d.add_argument("image")
+    d.add_argument("-o", "--out", help="board JSON to write")
+    d.add_argument("--preview", default="detected.png",
+                   help="PNG showing what was detected")
+    d.add_argument("--no-water", action="store_true",
+                   help="skip water detection and treat the whole map as open")
+    d.add_argument("--solve", action="store_true", help="also plan roads")
+    d.add_argument("--layout", default="layout.png", help="PNG for the plan")
+    _add_solver_flags(d)
+    d.set_defaults(func=cmd_detect)
+
+    c = sub.add_parser("capture", help="grab the screen, detect, and plan")
+    c.add_argument("--shot", default="screenshot.png")
+    c.add_argument("-o", "--out", default="board.json")
+    c.add_argument("--preview", default="detected.png")
+    c.add_argument("--layout", default="layout.png")
+    c.add_argument("--no-water", action="store_true")
+    _add_solver_flags(c)
+    c.set_defaults(func=cmd_capture)
+
+    args = p.parse_args(argv)
+    return args.func(args)
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

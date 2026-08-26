@@ -1,0 +1,4 @@
+# Runtime dependencies.  `pip install -e ".[dev]"` gets these plus the linters;
+# `pip install -e ".[capture]"` adds pyautogui for the `capture` command.
+numpy>=2.0
+pillow>=11.0
