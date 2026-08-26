@@ -171,7 +171,7 @@ expect to hand-edit the JSON.
 ## Development
 
 ```sh
-python -m unittest discover -s tests -v   # 98 tests
+python -m unittest discover -s tests -v   # 101 tests
 ruff check .
 mypy
 python benchmark.py                       # tightness and runtime

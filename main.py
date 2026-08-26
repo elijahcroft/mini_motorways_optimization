@@ -71,6 +71,21 @@ def _load_board(path: str) -> Board:
     return board
 
 
+def _write(what: str, dest: str, write) -> None:
+    """Run an output step, reporting a bad destination instead of unwinding.
+
+    The report has already been printed by the time anything is written, so a
+    file that cannot be created is worth one line, not a traceback.
+    """
+    try:
+        write()
+    except OSError as exc:
+        raise SystemExit(f"cannot write the {what} to {dest}: {exc.strerror}") from None
+    except ValueError as exc:  # pillow rejects a name it cannot pick a format from
+        raise SystemExit(f"cannot write the {what} to {dest}: {exc}") from None
+    print("wrote", dest)
+
+
 def _plan(board: Board, args) -> Solution:
     return solve(
         board,
@@ -91,7 +106,8 @@ def cmd_solve(args) -> int:
     if args.out:
         from render import render
 
-        print("wrote", render(board, solution, args.out, heat=not args.no_heat))
+        _write("layout", args.out,
+               lambda: render(board, solution, args.out, heat=not args.no_heat))
     return 0
 
 
@@ -116,10 +132,10 @@ def cmd_detect(args) -> int:
           f"{len(board.stores)} stores, {len(board.blocked)} blocked cells "
           f"on a {board.width}x{board.height} grid")
     if args.out:
-        board.save(args.out)
-        print("wrote", args.out)
+        _write("board", args.out, lambda: board.save(args.out))
     if args.preview:
-        print("wrote", vision.preview(args.image, blobs, args.preview))
+        _write("preview", args.preview,
+               lambda: vision.preview(args.image, blobs, args.preview))
     if args.solve:
         problems = board.validate()
         if problems:
@@ -132,7 +148,9 @@ def cmd_detect(args) -> int:
         if args.layout:
             from render import render
 
-            print("wrote", render(board, solution, args.layout, heat=not args.no_heat))
+            _write("layout", args.layout,
+                   lambda: render(board, solution, args.layout,
+                                  heat=not args.no_heat))
     return 0
 
 

@@ -149,6 +149,30 @@ class BadInputTests(unittest.TestCase):
             main.main(["solve", str(Path(self.dir.name) / "nope.json")])
         self.assertIn("no such board file", str(raised.exception))
 
+    def test_an_unwritable_layout_destination_is_reported(self):
+        board = Path(self.dir.name) / "b.json"
+        Board.from_ascii("r . R").save(board)
+        missing = Path(self.dir.name) / "no" / "such" / "dir" / "out.png"
+        with self.assertRaises(SystemExit) as raised, captured():
+            main.main(["solve", str(board), "-o", str(missing)])
+        self.assertIn("cannot write the layout", str(raised.exception))
+
+    def test_a_layout_name_with_no_image_extension_is_reported(self):
+        board = Path(self.dir.name) / "b.json"
+        Board.from_ascii("r . R").save(board)
+        with self.assertRaises(SystemExit) as raised, captured():
+            main.main(["solve", str(board), "-o", str(Path(self.dir.name) / "out")])
+        self.assertIn("cannot write the layout", str(raised.exception))
+
+    def test_an_unwritable_board_destination_is_reported(self):
+        image = HERE / "test_image.jpeg"
+        if not image.exists():
+            self.skipTest("sample screenshot not present")
+        missing = Path(self.dir.name) / "no" / "such" / "dir" / "b.json"
+        with self.assertRaises(SystemExit) as raised, captured():
+            main.main(["detect", str(image), "-o", str(missing), "--preview", ""])
+        self.assertIn("cannot write the board", str(raised.exception))
+
     def test_negative_spread_is_rejected_by_the_parser(self):
         board = Path(self.dir.name) / "b.json"
         Board.from_ascii("r . R").save(board)
