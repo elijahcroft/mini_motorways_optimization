@@ -17,6 +17,18 @@ from board import Board
 from solver import Solution, solve
 
 
+def _version() -> str:
+    """The installed version, or a placeholder when run straight from a checkout."""
+    try:
+        from importlib.metadata import version
+    except ImportError:  # pragma: no cover - Python 3.8 only
+        return "unknown"
+    try:
+        return version("minimotor")
+    except Exception:  # not installed, e.g. `python main.py` from the repo
+        return "unknown"
+
+
 def _report(board: Board, solution: Solution, out=None) -> None:
     # Resolved on each call, not bound at import, so redirected output works.
     stream = out if out is not None else sys.stdout
@@ -206,6 +218,7 @@ def main(argv: list[str] | None = None) -> int:
     p = argparse.ArgumentParser(
         description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
     )
+    p.add_argument("--version", action="version", version=f"minimotor {_version()}")
     sub = p.add_subparsers(dest="cmd", required=True)
 
     s = sub.add_parser("solve", help="plan roads for a board file")

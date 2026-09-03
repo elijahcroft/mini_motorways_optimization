@@ -38,6 +38,17 @@ class BlobTests(unittest.TestCase):
         self.assertEqual(sorted(b["kind"] for b in blobs),
                          ["house", "house", "store"])
 
+    def test_purple_reads_as_purple_not_blue(self):
+        # The game's purple is a muted blue-violet.  The old palette entry was
+        # a bright lavender that sits closer to blue in RGB space, so every
+        # purple house came back labelled "blue".  Use the real on-screen
+        # colour here (not COLORS["purple"]) so a revert re-breaks this test.
+        purple = (107, 96, 162)
+        img = draw((240, 200), [(20, 20, 20, 20, purple),
+                                (120, 20, 20, 20, COLORS["blue"])])
+        _board, blobs = vision.detect(img, detect_water=False)
+        self.assertEqual({b["color"] for b in blobs}, {"purple", "blue"})
+
     def test_lettering_is_not_mistaken_for_a_building(self):
         # A hollow ring is square and solid-ish but empty through the middle,
         # which is how text and outlines behave.

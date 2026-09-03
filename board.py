@@ -18,11 +18,16 @@ from pathlib import Path
 Cell = tuple[int, int]
 
 # The palette the game uses, and the RGB we draw each colour with.
+#
+# These are the colours a *building* reads as, not a bright sample from the
+# art.  In particular purple is a muted blue-violet on screen; a lavender
+# like (139, 126, 214) sits closer to blue in RGB space than to the real
+# purple, which is how every purple house came back labelled "blue".
 COLORS: dict[str, tuple[int, int, int]] = {
     "red": (231, 106, 84),
     "pink": (226, 90, 162),
     "yellow": (245, 191, 66),
-    "purple": (139, 126, 214),
+    "purple": (107, 96, 162),
     "teal": (73, 176, 173),
     "blue": (79, 121, 190),
     "green": (108, 183, 118),

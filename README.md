@@ -212,8 +212,6 @@ This part is heuristic and depends on resolution, zoom and map. Known limits:
   may route through it on maps where the city does not fill the frame.
 - Houses packed in a 2×2 block read as one store, since at that point they are
   genuinely the same shape and size as one.
-- Purple is reported as `blue` — the nearest entry in the palette. Consistent, but
-  the label is wrong.
 
 Always look at the `detected.png` preview before trusting a detected board, and
 expect to hand-edit the JSON.
@@ -221,7 +219,7 @@ expect to hand-edit the JSON.
 ## Development
 
 ```sh
-python -m unittest discover -s tests -v   # 101 tests
+python -m unittest discover -s tests -v   # 107 tests
 ruff check .
 mypy
 python benchmark.py                       # tightness and runtime

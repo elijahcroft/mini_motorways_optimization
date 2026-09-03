@@ -11,6 +11,3 @@ __pycache__/
 build/
 dist/
 /board.json
-
-# leftovers from the pre-rewrite version; still on disk, delete when you are sure
-house_images/

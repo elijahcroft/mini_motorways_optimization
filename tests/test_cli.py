@@ -200,6 +200,11 @@ class ArgumentTests(unittest.TestCase):
         for cmd in ("solve", "detect", "capture"):
             self.assertIn(cmd, text)
 
+    def test_version_prints_a_version(self):
+        with self.assertRaises(SystemExit), captured() as (out, _):
+            main.main(["--version"])
+        self.assertRegex(out.getvalue(), r"^minimotor \S+")
+
 
 if __name__ == "__main__":
     unittest.main()
