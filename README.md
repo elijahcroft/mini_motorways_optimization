@@ -9,12 +9,19 @@ a screenshot of the running game.
 ## Setup
 
 ```sh
+./mm            # builds .venv on first run, then opens the overlay
+```
+
+`./mm` forwards anything else straight to `main.py`, so `./mm solve ...` works
+too. To set the venv up by hand instead:
+
+```sh
 python3 -m venv .venv
 ./.venv/bin/pip install -e ".[dev]"
 ```
 
-`pyautogui` is only needed for the `capture` command and is not installed by
-default; `solve` and `detect` need nothing but numpy and pillow.
+Screen capture uses `grim` on Wayland and `pyautogui` on X11. `solve` and
+`detect` need nothing but numpy and pillow.
 
 ## Use
 
@@ -33,9 +40,51 @@ python main.py detect shot.png -o board.json --solve
 
 # grab the screen and do all of the above in one go
 python main.py capture
+
+# floating panel that re-plans from the screen on a hotkey
+python main.py overlay --now
 ```
 
 `--json` prints the stats as machine-readable JSON instead of a report.
+
+## The overlay
+
+`./mm` opens a small always-on-top panel that reads the board off your screen
+and draws the plan. It does nothing until you ask it to: hit **refresh** in the
+panel, press **r** while it has focus, or -- the point of the thing -- signal it
+from a game hotkey, since the game will have the keyboard, not the panel.
+
+The panel prints its own pid on startup:
+
+```
+overlay running as pid 755407
+refresh from anywhere:  kill -USR1 755407
+```
+
+So bind that in `hyprland.conf`, along with rules to float and pin it out of
+the tiling layout:
+
+```
+windowrulev2 = float, class:^(Tk)$, title:^(minimotor)$
+windowrulev2 = pin, class:^(Tk)$, title:^(minimotor)$
+windowrulev2 = noinitialfocus, class:^(Tk)$, title:^(minimotor)$
+
+bind = SUPER, M, exec, pkill -USR1 -f "main.py overlay"
+```
+
+It hides itself for a moment before each grab, so it never ends up planning a
+picture of itself. A refresh takes a couple of seconds on a full board and runs
+off the main thread, so the panel stays responsive while it thinks.
+
+`--geometry 500x700+40+40` places it, `--alpha 0.85` makes it translucent,
+`--cell` sets how big the drawn plan is, and every `solve` flag works here too:
+
+```sh
+./mm overlay --spread 1 --alpha 0.85 --geometry +1400+60
+```
+
+Clicks land on the panel, so keep it in a corner clear of the board. Detection
+is the same heuristic `detect` uses, with the same limits -- see below.
 
 ## What "optimal" means here
 
@@ -81,6 +130,7 @@ without reading the numbers.
 | `solver.py` | assigns houses to stores, then routes the roads |
 | `render.py` | draws a board and its plan to a PNG, shaded by traffic |
 | `vision.py` | turns a screenshot into a board (heuristic) |
+| `overlay.py` | screen grab, and the floating panel |
 | `main.py` | the command line |
 | `benchmark.py` | measures layout tightness and runtime |
 

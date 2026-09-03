@@ -4,6 +4,7 @@
     python main.py solve boards/riverside.json --spread 1 --fit-budget
     python main.py detect shot.png -o board.json --solve
     python main.py capture
+    python main.py overlay --now
 """
 
 from __future__ import annotations
@@ -154,13 +155,20 @@ def cmd_detect(args) -> int:
     return 0
 
 
+def cmd_overlay(args) -> int:
+    import overlay
+
+    return overlay.run(args)
+
+
 def cmd_capture(args) -> int:
+    from overlay import grab
+
     try:
-        import pyautogui
-    except ImportError:
-        print("capture needs pyautogui: pip install pyautogui", file=sys.stderr)
+        grab(args.shot)
+    except (RuntimeError, OSError) as exc:
+        print(exc, file=sys.stderr)
         return 1
-    pyautogui.screenshot().save(args.shot)
     print("wrote", args.shot)
     args.image = args.shot
     args.solve = True
@@ -227,6 +235,26 @@ def main(argv: list[str] | None = None) -> int:
     c.add_argument("--no-water", action="store_true")
     _add_solver_flags(c)
     c.set_defaults(func=cmd_capture)
+
+    o = sub.add_parser("overlay", help="floating panel that re-plans on a hotkey")
+    o.add_argument("--geometry", default="+40+40",
+                   help="Tk geometry for the panel, e.g. 500x700+40+40")
+    o.add_argument("--width", type=int, default=380,
+                   help="widest the plan image is drawn")
+    o.add_argument("--height", type=int, default=520,
+                   help="tallest the plan image is drawn")
+    o.add_argument("--alpha", type=float, default=1.0,
+                   help="panel opacity, 0 to 1")
+    o.add_argument("--cell", type=int, default=18,
+                   help="pixels per grid cell when drawing the plan")
+    o.add_argument("--hide-ms", type=int, default=180,
+                   help="how long to wait for the panel to disappear before "
+                        "grabbing, so it is not in its own screenshot")
+    o.add_argument("--now", action="store_true", help="plan once on startup")
+    o.add_argument("--no-water", action="store_true",
+                   help="skip water detection and treat the whole map as open")
+    _add_solver_flags(o)
+    o.set_defaults(func=cmd_overlay)
 
     args = p.parse_args(argv)
     return args.func(args)

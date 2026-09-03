@@ -15,7 +15,7 @@ capture = ["pyautogui>=0.9.54"]
 dev = ["ruff>=0.6", "mypy>=1.11"]
 
 [tool.setuptools]
-py-modules = ["board", "solver", "render", "vision", "main", "benchmark"]
+py-modules = ["board", "solver", "render", "vision", "overlay", "main", "benchmark"]
 
 [project.scripts]
 minimotor = "main:main"
@@ -33,6 +33,6 @@ ignore = ["E501"]
 
 [tool.mypy]
 python_version = "3.12"
-files = ["board.py", "solver.py", "render.py", "vision.py", "main.py", "benchmark.py"]
+files = ["board.py", "solver.py", "render.py", "vision.py", "overlay.py", "main.py", "benchmark.py"]
 ignore_missing_imports = true
 warn_unused_ignores = true
